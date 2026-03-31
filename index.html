@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>세계 지도 커스텀 도구</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=Inter:wght@400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#F4F5F7;font-family:'Noto Sans KR','Inter',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sb{width:330px;min-width:330px;background:#fff;border-right:1px solid #E8EAED;display:flex;flex-direction:column;height:100vh}
+.sb-hd{padding:20px 20px 14px;border-bottom:1px solid #f0f0f0}
+.sb-hd h1{font-size:17px;font-weight:800;color:#1A1A2E}
+.sb-hd p{font-size:11px;color:#999;margin-top:3px}
+.sb-body{flex:1;overflow-y:auto;padding:14px 20px}
+.sb-body::-webkit-scrollbar{width:4px}
+.sb-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+.sb-ft{padding:12px 20px;border-top:1px solid #f0f0f0;display:flex;gap:6px}
+.sb-ft .btn{flex:1;text-align:center}
+
+.sec{margin-bottom:20px}
+.sec-t{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:14px}
+.tab{flex:1;padding:8px 0;text-align:center;font-size:12px;font-weight:600;color:#888;background:#F4F5F7;border:none;border-radius:8px;cursor:pointer;font-family:inherit;transition:all .12s}
+.tab:hover{background:#EAEBEE}
+.tab.on{background:#1A1A2E;color:#fff}
+
+/* Buttons */
+.btn{padding:8px 12px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .12s}
+.btn-p{background:#1A1A2E;color:#fff}.btn-p:hover{background:#2a2a42}
+.btn-s{background:#F4F5F7;color:#666}.btn-s:hover{background:#EAEBEE}
+.btn-d{background:#FFF0F0;color:#E74C3C}.btn-d:hover{background:#FFE0E0}
+.btn-sm{padding:5px 9px;font-size:11px}
+
+/* Palette */
+.pal{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sw{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .1s;flex-shrink:0}
+.sw:hover{transform:scale(1.12)}
+.sw.on{border-color:#1A1A2E;box-shadow:0 0 0 2px #fff,0 0 0 4px #1A1A2E}
+.sw.eraser{background:#fff!important;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:13px}
+.sw.eraser.on{border-color:#1A1A2E;box-shadow:0 0 0 2px #fff,0 0 0 4px #1A1A2E}
+.cc-row{display:flex;align-items:center;gap:6px;margin-top:8px}
+.cc-row input[type=color]{width:28px;height:28px;border:none;border-radius:50%;cursor:pointer;padding:0;background:none}
+.cc-row span{font-size:10.5px;color:#999}
+
+/* Lists */
+.sel-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#F8F9FA;border-radius:8px;font-size:12px;font-weight:500;color:#333;margin-bottom:4px}
+.sel-item .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sel-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-item .rm{width:18px;height:18px;border:none;background:none;color:#bbb;cursor:pointer;font-size:13px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.sel-item .rm:hover{background:#eee;color:#666}
+.empty{font-size:12px;color:#bbb;text-align:center;padding:14px 0;line-height:1.6}
+
+/* Form */
+.frm{display:flex;flex-direction:column;gap:6px}
+.frm input,.frm select{width:100%;padding:8px 10px;border:1.5px solid #E8EAED;border-radius:8px;font-size:12px;font-family:inherit;outline:none}
+.frm input:focus{border-color:#1A1A2E}
+.frm .row{display:flex;gap:6px}
+.frm .row input{flex:1}
+
+/* Pin list */
+.pin-it{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8F9FA;border-radius:8px;font-size:12px;margin-bottom:4px}
+.pin-it .ic{font-size:13px;flex-shrink:0}
+.pin-it .nm{flex:1;font-weight:500}
+.pin-it .co{font-size:10px;color:#999}
+
+/* Toggle / Size */
+.tg{display:flex;gap:2px}
+.tg-btn{padding:6px 11px;font-size:11px;font-weight:600;border:1.5px solid #E0E0E0;background:#fff;color:#888;cursor:pointer;font-family:inherit;transition:all .1s}
+.tg-btn:first-child{border-radius:6px 0 0 6px}.tg-btn:last-child{border-radius:0 6px 6px 0}
+.tg-btn.on{background:#1A1A2E;color:#fff;border-color:#1A1A2E}
+.sz-btn{padding:5px 9px;font-size:11px;font-weight:600;border:1.5px solid #E0E0E0;background:#fff;color:#888;cursor:pointer;font-family:inherit;border-radius:6px;transition:all .1s}
+.sz-btn.on{background:#1A1A2E;color:#fff;border-color:#1A1A2E}
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ctrl-row label{font-size:12px;color:#555;min-width:65px}
+.range-row{display:flex;align-items:center;gap:8px}
+.range-row input[type=range]{flex:1;accent-color:#1A1A2E}
+.range-row span{font-size:11px;color:#999;min-width:30px}
+
+/* Main */
+.main{flex:1;position:relative;overflow:hidden;background:#F8FAFC}
+#map-c{width:100%;height:100%}
+#map-c svg{width:100%;height:100%;display:block}
+.region{stroke-linejoin:round;cursor:pointer;transition:filter .1s}
+.region:hover{filter:brightness(0.88)}
+.grat{fill:none;stroke:#EEF0F2;stroke-width:.3}
+.tip{position:absolute;background:#1A1A2E;color:#fff;padding:6px 13px;border-radius:7px;font-size:12px;font-weight:600;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.zm{position:absolute;bottom:18px;right:18px;display:flex;flex-direction:column;gap:3px}
+.zm button{width:36px;height:36px;background:#fff;border:1px solid #E0E0E0;border-radius:8px;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;box-shadow:0 2px 5px rgba(0,0,0,.05)}
+.zm button:hover{background:#F4F5F7}
+.hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:#fff;padding:8px 20px;border-radius:9px;font-size:12px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:50;pointer-events:none;opacity:1;transition:opacity .5s}
+.hint.hid{opacity:0}
+.ld{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#bbb;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="sb">
+  <div class="sb-hd">
+    <h1>🌍 지도 커스텀 도구</h1>
+    <p>색상 선택 → 지도에서 지역 클릭</p>
+  </div>
+  <div class="sb-body">
+    <div class="tabs">
+      <button class="tab on" data-m="paint" onclick="setMode('paint')">🎨 색칠</button>
+      <button class="tab" data-m="pin" onclick="setMode('pin')">📍 핀</button>
+      <button class="tab" data-m="label" onclick="setMode('label')">🏷 라벨</button>
+      <button class="tab" data-m="settings" onclick="setMode('settings')">⚙️</button>
+    </div>
+
+    <!-- 색칠 -->
+    <div id="p-paint">
+      <div class="sec">
+        <div class="sec-t">컬러 선택</div>
+        <div class="pal" id="palette"></div>
+        <div class="cc-row">
+          <input type="color" id="ccInput" value="#FF6B9D">
+          <span>커스텀</span>
+          <button class="btn btn-s btn-sm" onclick="addCC()">+</button>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">구분선 두께</div>
+        <div class="range-row">
+          <input type="range" id="borderW" min="0" max="3" step="0.1" value="0.6" oninput="setBorderW(this.value)">
+          <span id="borderWVal">0.6</span>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">선택된 지역 (<span id="cnt">0</span>)</div>
+        <div id="selList"><div class="empty">지도에서 지역을 클릭하세요</div></div>
+      </div>
+    </div>
+
+    <!-- 핀 -->
+    <div id="p-pin" style="display:none">
+      <div class="sec">
+        <div class="sec-t">새 핀 추가</div>
+        <p style="font-size:11px;color:#999;margin-bottom:6px">지도 클릭 → 좌표 자동 입력</p>
+        <div class="frm">
+          <input type="text" id="piN" placeholder="도시/장소 이름">
+          <div class="row">
+            <input type="text" id="piLon" placeholder="경도">
+            <input type="text" id="piLat" placeholder="위도">
+          </div>
+          <div class="pal" id="pinPal" style="margin:2px 0"></div>
+          <div class="cc-row">
+            <input type="color" id="pinCcInput" value="#FF6B9D">
+            <span>커스텀</span>
+            <button class="btn btn-s btn-sm" onclick="addPinCC()">+</button>
+          </div>
+          <button class="btn btn-p" onclick="addPin()">핀 추가</button>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">핀 목록 (<span id="piCnt">0</span>)</div>
+        <div id="piList"><div class="empty">아직 핀이 없습니다</div></div>
+      </div>
+    </div>
+
+    <!-- 라벨 -->
+    <div id="p-label" style="display:none">
+      <div class="sec">
+        <div class="sec-t">라벨 스타일</div>
+        <div class="ctrl-row">
+          <label>디자인</label>
+          <div class="tg" id="tgStyle">
+            <button class="tg-btn on" onclick="setLS('text')">텍스트</button>
+            <button class="tg-btn" onclick="setLS('image')">이미지</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <label>크기</label>
+          <div style="display:flex;gap:4px" id="tgSize">
+            <button class="sz-btn" onclick="setLSz(0.8)">×0.8</button>
+            <button class="sz-btn on" onclick="setLSz(1.0)">×1.0</button>
+            <button class="sz-btn" onclick="setLSz(1.5)">×1.5</button>
+            <button class="sz-btn" onclick="setLSz(2.0)">×2.0</button>
+            <button class="sz-btn" onclick="setLSz(3.0)">×3.0</button>
+          </div>
+        </div>
+      </div>
+      <div class="sec" id="imgSec" style="display:none">
+        <div class="sec-t">핀별 이미지 URL</div>
+        <p style="font-size:10.5px;color:#999;margin-bottom:6px">원형으로 클리핑됩니다</p>
+        <div id="imgList"></div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">미리보기</div>
+        <div style="background:#F4F5F7;border-radius:10px;padding:14px;text-align:center">
+          <svg id="prevSvg" width="260" height="90" viewBox="0 0 260 90"></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- 설정 -->
+    <div id="p-settings" style="display:none">
+      <div class="sec">
+        <div class="sec-t">지도 스타일</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="chkG" checked onchange="togGrat()"> 격자선
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px">
+            바다 <input type="color" id="ocC" value="#F8FAFC" onchange="chgOcean()" style="width:24px;height:24px;border:none;border-radius:6px;cursor:pointer">
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:8px">
+            땅 <input type="color" id="ldC" value="#E8EAED" onchange="chgLand()" style="width:24px;height:24px;border:none;border-radius:6px;cursor:pointer">
+          </label>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">빠른 이동</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button class="btn btn-s btn-sm" onclick="fly(0,20,200)">🌍 전세계</button>
+          <button class="btn btn-s btn-sm" onclick="fly(105,35,500)">아시아</button>
+          <button class="btn btn-s btn-sm" onclick="fly(15,52,800)">유럽</button>
+          <button class="btn btn-s btn-sm" onclick="fly(-95,38,600)">북미</button>
+          <button class="btn btn-s btn-sm" onclick="fly(-60,-15,500)">남미</button>
+          <button class="btn btn-s btn-sm" onclick="fly(25,0,450)">아프리카</button>
+          <button class="btn btn-s btn-sm" onclick="fly(135,-25,700)">호주</button>
+          <button class="btn btn-s btn-sm" onclick="fly(127.5,36,5000)">🇰🇷 한국</button>
+          <button class="btn btn-s btn-sm" onclick="fly(139,36,3000)">🇯🇵 일본</button>
+          <button class="btn btn-s btn-sm" onclick="fly(-102,23.5,1800)">🇲🇽 멕시코</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sb-ft">
+    <button class="btn btn-p" onclick="exportSVG()">📥 이미지 저장</button>
+    <button class="btn btn-d" onclick="resetAll()">🗑 초기화</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="map-c"><div class="ld" id="ld">전세계 행정구역 데이터 로딩 중...</div></div>
+  <div class="tip" id="tip"></div>
+  <div class="hint" id="hint">🎨 색상 선택 후 지도에서 지역을 클릭하세요</div>
+  <div class="zm">
+    <button onclick="zIn()">+</button>
+    <button onclick="zOut()">−</button>
+    <button onclick="zReset()" style="font-size:12px">↺</button>
+  </div>
+</div>
+
+<script>
+// ═══ STATE ═══
+let mode='paint', curColor='#5B9BD5', painted={}, pins=[], pinColor='#1A1A2E';
+let lStyle='text', lSize=1.0, lBase=0.3, borderWidth=0.6;
+let features=[], svg, gR, gP, proj, pathG, zm;
+const W=1400, H=900;
+const colors=['#5B9BD5','#F5A623','#50C878','#E74C3C','#9B59B6','#FF6B9D','#1ABC9C','#F1C40F','#3498DB','#E67E22','#2ECC71','#E91E63'];
+let pal=[...colors];
+const tip=d3.select('#tip');
+
+const defaultPins=[
+  {name:'멕시코시티',lon:-99.1332,lat:19.4326,color:'#5B9BD5',img:''},
+  {name:'와하카',lon:-96.7266,lat:17.0732,color:'#F5A623',img:''},
+  {name:'칸쿤',lon:-86.8515,lat:21.1619,color:'#50C878',img:''}
+];
+
+// US FIPS
+const usN={'01':'Alabama','02':'Alaska','04':'Arizona','05':'Arkansas','06':'California','08':'Colorado','09':'Connecticut','10':'Delaware','11':'DC','12':'Florida','13':'Georgia','15':'Hawaii','16':'Idaho','17':'Illinois','18':'Indiana','19':'Iowa','20':'Kansas','21':'Kentucky','22':'Louisiana','23':'Maine','24':'Maryland','25':'Massachusetts','26':'Michigan','27':'Minnesota','28':'Mississippi','29':'Missouri','30':'Montana','31':'Nebraska','32':'Nevada','33':'New Hampshire','34':'New Jersey','35':'New Mexico','36':'New York','37':'North Carolina','38':'North Dakota','39':'Ohio','40':'Oklahoma','41':'Oregon','42':'Pennsylvania','44':'Rhode Island','45':'South Carolina','46':'South Dakota','47':'Tennessee','48':'Texas','49':'Utah','50':'Vermont','51':'Virginia','53':'Washington','54':'West Virginia','55':'Wisconsin','56':'Wyoming','72':'Puerto Rico'};
+
+function rName(f){
+  const p=f.properties||{};
+  return p.name||p.NAME||p.state_name||p.NOMGEO||p.NOM_ENT||p.ESTADO||p.name_en||p.gn_name||p.admin||p.NAME_1||usN[String(f.id).padStart(2,'0')]||'';
+}
+function aName(f){const p=f.properties||{};return p.admin||p.ADM0_A3||p.sov_a3||'';}
+
+// ═══ PALETTE ═══
+function rPal(id,sel,eraser){
+  const el=document.getElementById(id);el.innerHTML='';
+  if(eraser){const e=document.createElement('div');e.className='sw eraser'+(curColor===null?' on':'');e.innerHTML='✕';e.title='지우개';e.onclick=()=>{sel(null);rPals()};el.appendChild(e);}
+  pal.forEach(c=>{const d=document.createElement('div');d.className='sw';
+    if(id==='palette'&&c===curColor)d.className+=' on';
+    if(id==='pinPal'&&c===pinColor)d.className+=' on';
+    d.style.background=c;d.style.boxShadow=`0 2px 6px ${c}40`;
+    d.onclick=()=>{sel(c);rPals()};el.appendChild(d);});
+}
+function rPals(){rPal('palette',c=>{curColor=c},true);rPal('pinPal',c=>{pinColor=c});}
+function addCC(){const c=document.getElementById('ccInput').value;if(!pal.includes(c))pal.push(c);curColor=c;rPals();}
+
+// ═══ MODE ═══
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.m===m));
+  ['paint','pin','label','settings'].forEach(p=>{document.getElementById('p-'+p).style.display=p===m?'block':'none';});
+  if(m==='label'){rPreview();rImgList();}
+  const h=document.getElementById('hint');
+  h.textContent={paint:'🎨 색상 선택 후 지역 클릭',pin:'📍 지도 클릭 → 좌표 자동입력',label:'🏷 라벨 스타일 설정',settings:'⚙️ 설정 변경'}[m]||'';
+  h.classList.remove('hid');setTimeout(()=>h.classList.add('hid'),3000);
+}
+
+// ═══ BORDER WIDTH ═══
+function setBorderW(v){
+  borderWidth=parseFloat(v);
+  document.getElementById('borderWVal').textContent=v;
+  svg.selectAll('.region').style('stroke-width',borderWidth+'px');
+}
+
+// ═══ SELECTED LIST ═══
+function rSelList(){
+  const el=document.getElementById('selList'),e=Object.entries(painted);
+  document.getElementById('cnt').textContent=e.length;
+  if(!e.length){el.innerHTML='<div class="empty">지도에서 지역을 클릭하세요</div>';return;}
+  el.innerHTML=e.map(([n,c])=>`<div class="sel-item"><div class="dot" style="background:${c}"></div><span class="nm">${n}</span><button class="rm" onclick="rmSel(\`${n.replace(/`/g,'')}\`)">✕</button></div>`).join('');
+}
+function rmSel(n){delete painted[n];rSelList();updColors();}
+
+// ═══ PINS ═══
+function rPiList(){
+  const el=document.getElementById('piList');
+  document.getElementById('piCnt').textContent=pins.length;
+  if(!pins.length){el.innerHTML='<div class="empty">아직 핀이 없습니다</div>';return;}
+  el.innerHTML=pins.map((p,i)=>`<div class="pin-it"><span class="ic" style="color:${p.color}">📍</span><span class="nm">${p.name}</span><span class="co">${p.lon.toFixed(1)},${p.lat.toFixed(1)}</span><button class="rm" onclick="rmPi(${i})">✕</button></div>`).join('');
+}
+function addPin(){
+  const n=document.getElementById('piN').value.trim(),lo=parseFloat(document.getElementById('piLon').value),la=parseFloat(document.getElementById('piLat').value);
+  if(!n||isNaN(lo)||isNaN(la))return;
+  pins.push({name:n,lon:lo,lat:la,color:pinColor,img:''});
+  document.getElementById('piN').value='';document.getElementById('piLon').value='';document.getElementById('piLat').value='';
+  rPiList();drawPins();
+}
+function rmPi(i){pins.splice(i,1);rPiList();drawPins();}
+function addPinCC(){const c=document.getElementById('pinCcInput').value;if(!pal.includes(c))pal.push(c);pinColor=c;rPals();}
+
+// ═══ LABEL ═══
+function setLS(s){lStyle=s;document.querySelectorAll('#tgStyle .tg-btn').forEach(b=>b.classList.toggle('on',b.textContent===(s==='text'?'텍스트':'이미지')));document.getElementById('imgSec').style.display=s==='image'?'block':'none';rPreview();drawPins();}
+function setLSz(s){lSize=s;document.querySelectorAll('#tgSize .sz-btn').forEach(b=>b.classList.toggle('on',parseFloat(b.textContent.replace('×',''))===s));rPreview();drawPins();}
+function rImgList(){
+  const el=document.getElementById('imgList');
+  if(!pins.length){el.innerHTML='<div class="empty">먼저 핀을 추가하세요</div>';return;}
+  el.innerHTML=pins.map((p,i)=>`<div style="margin-bottom:7px"><div style="font-size:11.5px;font-weight:600;margin-bottom:2px">${p.name}</div><input class="frm" style="padding:7px 9px;font-size:11px;border:1.5px solid #E8EAED;border-radius:7px" placeholder="이미지 URL" value="${p.img||''}" onchange="updImg(${i},this.value)"></div>`).join('');
+}
+function updImg(i,u){pins[i].img=u;drawPins();}
+function rPreview(){
+  const s=d3.select('#prevSvg');s.selectAll('*').remove();const z=lSize*lBase;
+  if(lStyle==='text'){
+    const w=90*z,h=26*z,r=6*z,fs=12*z;
+    s.append('path').attr('d',`M ${130-4*z} ${45+h/2-45+25} l ${4*z} ${5*z} l ${4*z} ${-5*z} Z`).attr('fill','#1A1A2E');
+    s.append('rect').attr('x',130-w/2).attr('y',25-h/2).attr('width',w).attr('height',h).attr('rx',r).attr('fill','#1A1A2E');
+    s.append('text').attr('x',130).attr('y',25).attr('dy','.37em').attr('text-anchor','middle').attr('fill','#fff').attr('font-size',fs).attr('font-weight','700').attr('font-family',"'Noto Sans KR'").text('멕시코시티');
+    // pin dot
+    s.append('circle').attr('cx',130).attr('cy',55).attr('r',4*z).attr('fill','#5B9BD5').attr('stroke','#fff').attr('stroke-width',2);
+  } else {
+    const r=22*z;
+    const defs=s.append('defs');
+    defs.append('clipPath').attr('id','pc').append('circle').attr('cx',130).attr('cy',30).attr('r',r);
+    s.append('circle').attr('cx',130).attr('cy',30).attr('r',r+2.5).attr('fill','#fff').attr('stroke','#ddd').attr('stroke-width',1);
+    s.append('rect').attr('x',130-r).attr('y',30-r).attr('width',r*2).attr('height',r*2).attr('clip-path','url(#pc)').attr('fill','#ccc');
+    s.append('text').attr('x',130).attr('y',30).attr('dy','.35em').attr('text-anchor','middle').attr('fill','#999').attr('font-size',9).text('이미지');
+    s.append('text').attr('x',130).attr('y',30+r+14*z).attr('text-anchor','middle').attr('fill','#333').attr('font-size',11*z).attr('font-weight','700').attr('font-family',"'Noto Sans KR'").text('멕시코시티');
+  }
+}
+
+// ═══ SETTINGS ═══
+function togGrat(){svg.selectAll('.grat').style('display',document.getElementById('chkG').checked?'block':'none');}
+function chgOcean(){svg.select('.ocean').attr('fill',document.getElementById('ocC').value);}
+function chgLand(){const c=document.getElementById('ldC').value;svg.selectAll('.region').each(function(d){if(!painted[rName(d)])d3.select(this).style('fill',c)});}
+
+// ═══ MAP SETUP ═══
+function setup(){
+  svg=d3.select('#map-c').append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('preserveAspectRatio','xMidYMid meet');
+  const defs=svg.append('defs');
+  const f1=defs.append('filter').attr('id','ps').attr('x','-50%').attr('y','-30%').attr('width','200%').attr('height','200%');
+  f1.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',3).attr('flood-color','rgba(0,0,0,.25)');
+  const f2=defs.append('filter').attr('id','ls').attr('x','-20%').attr('y','-20%').attr('width','140%').attr('height','160%');
+  f2.append('feDropShadow').attr('dx',0).attr('dy',2).attr('stdDeviation',3).attr('flood-color','rgba(0,0,0,.15)');
+  svg.append('rect').attr('class','ocean').attr('width',W).attr('height',H).attr('fill','#F8FAFC');
+  proj=d3.geoMercator().center([0,30]).scale(220).translate([W/2,H/2]);
+  pathG=d3.geoPath().projection(proj);
+  svg.append('path').datum(d3.geoGraticule().step([20,20])).attr('class','grat').attr('d',pathG);
+  gR=svg.append('g');gP=svg.append('g');
+  zm=d3.zoom().scaleExtent([.8,30]).on('zoom',e=>{gR.attr('transform',e.transform);gP.attr('transform',e.transform);svg.select('.grat').attr('transform',e.transform)});
+  svg.call(zm);
+  svg.on('click',function(ev){
+    if(mode!=='pin')return;
+    const [x,y]=d3.pointer(ev),t=d3.zoomTransform(svg.node()),c=proj.invert([(x-t.x)/t.k,(y-t.y)/t.k]);
+    if(c){document.getElementById('piLon').value=c[0].toFixed(4);document.getElementById('piLat').value=c[1].toFixed(4);}
+  });
+}
+
+async function ff(urls){for(const u of urls){try{const r=await fetch(u);if(r.ok)return await r.json();}catch(e){}}return null;}
+
+async function loadMap(){
+  setup();
+
+  // 나라 단위 (CDN, 안정적) + 미국 주 단위 + 멕시코 주 단위
+  const cty=[
+    'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',
+    'https://unpkg.com/world-atlas@2/countries-50m.json',
+    'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
+  ];
+  const us=[
+    'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
+    'https://unpkg.com/us-atlas@3/states-10m.json',
+  ];
+  const mx=[
+    'https://cdn.jsdelivr.net/gh/strotgen/mexico-leaflet@master/states.geojson',
+    'https://cdn.jsdelivr.net/gh/PhantomInsights/mexico-geojson@main/national/states.json',
+    'https://raw.githubusercontent.com/strotgen/mexico-leaflet/master/states.geojson',
+  ];
+
+  const [cd, ud, md] = await Promise.all([ff(cty), ff(us), ff(mx)]);
+
+  if(!cd){
+    document.getElementById('ld').textContent='지도 데이터를 불러올 수 없습니다.';return;
+  }
+
+  // 나라 파싱
+  const k=Object.keys(cd.objects)[0];
+  let cf=topojson.feature(cd,cd.objects[k]).features;
+
+  // 미국은 주 단위로 교체
+  let uf=[];
+  if(ud){
+    cf=cf.filter(f=>{const id=f.id||(f.properties||{}).id;return id!=='840'&&id!==840;});
+    const uk=Object.keys(ud.objects)[0];
+    uf=topojson.feature(ud,ud.objects[uk]).features;
+  }
+
+  // 멕시코도 주 단위로 교체
+  let mf=[];
+  if(md){
+    cf=cf.filter(f=>{const id=f.id||(f.properties||{}).id;return id!=='484'&&id!==484;});
+    // GeoJSON: features 바로 사용, TopoJSON: objects에서 파싱
+    if(md.type==='FeatureCollection'){
+      mf=md.features;
+    } else if(md.objects){
+      const mk=Object.keys(md.objects)[0];
+      mf=topojson.feature(md,md.objects[mk]).features;
+    }
+    // 이름 속성 통일 (state_name, name, NAME 등)
+    mf.forEach(f=>{
+      const p=f.properties||{};
+      if(!p.name){
+        p.name=p.state_name||p.NOMGEO||p.NOM_ENT||p.ESTADO||p.NAME||p.state_code||'';
+      }
+    });
+  }
+  features=[...cf,...uf,...mf];
+
+  document.getElementById('ld').remove();
+
+  rSelList();
+
+  gR.selectAll('.region').data(features).enter().append('path')
+    .attr('class','region')
+    .attr('d',pathG)
+    .style('fill',d=>painted[rName(d)]||'#E8EAED')
+    .style('stroke','#fff')
+    .style('stroke-width',borderWidth+'px')
+    .on('click',function(ev,d){
+      if(mode!=='paint')return;ev.stopPropagation();
+      const n=rName(d);if(!n)return;
+      if(curColor===null){delete painted[n];d3.select(this).style('fill',document.getElementById('ldC').value||'#E8EAED');}
+      else{painted[n]=curColor;d3.select(this).style('fill',curColor);}
+      rSelList();
+    })
+    .on('mouseover',function(ev,d){
+      const n=rName(d),a=aName(d);
+      tip.style('opacity',1).text(a?`${n} (${a})`:n);
+    })
+    .on('mousemove',function(ev){tip.style('left',(ev.offsetX+12)+'px').style('top',(ev.offsetY-32)+'px');})
+    .on('mouseout',()=>tip.style('opacity',0));
+
+  // 기본 핀 & 컬러링 적용
+  pins=[...defaultPins];
+  // 멕시코 주 단위 컬러링 (다양한 이름 형식 대응)
+  const mxColors={
+    // 멕시코시티 / Estado de México 영역 (파란색)
+    'Distrito Federal':'#5B9BD5','Ciudad de México':'#5B9BD5','CDMX':'#5B9BD5',
+    'México':'#5B9BD5','Estado de México':'#5B9BD5','Mexico City':'#5B9BD5',
+    // 와하카 (주황색)
+    'Oaxaca':'#F5A623',
+    // 칸쿤이 있는 킨타나로오 (초록색)
+    'Quintana Roo':'#50C878',
+  };
+  // 멕시코 주 데이터가 없는 경우 국가 단위 fallback
+  if(!md) painted['Mexico']='#5B9BD5';
+  // 주 단위 컬러링 적용
+  features.forEach(f=>{
+    const n=rName(f);
+    if(mxColors[n]) painted[n]=mxColors[n];
+  });
+  rSelList();updColors();
+  rPiList();drawPins();
+
+  // 멕시코 뷰로 자동 이동
+  setTimeout(()=>fly(-102,23.5,1800),800);
+  setTimeout(()=>document.getElementById('hint').classList.add('hid'),4000);
+}
+
+function updColors(){
+  const lc=document.getElementById('ldC').value||'#E8EAED';
+  svg.selectAll('.region').each(function(d){d3.select(this).style('fill',painted[rName(d)]||lc);});
+}
+
+// ═══ DRAW PINS ═══
+function drawPins(){
+  gP.selectAll('*').remove();
+  const defs=svg.select('defs');defs.selectAll('[id^="ic"]').remove();
+  pins.forEach((p,i)=>{
+    const [cx,cy]=proj([p.lon,p.lat]);if(!cx||!cy)return;
+    const g=gP.append('g'),s=lSize*lBase;
+    g.style('cursor','pointer').on('click',function(ev){
+      ev.stopPropagation();
+      if(confirm(`"${p.name}" 핀을 삭제할까요?`)){rmPi(i);}
+    });
+    if(lStyle==='image'&&p.img){
+      const r=24*s,clipId='ic'+i;
+      defs.append('clipPath').attr('id',clipId).append('circle').attr('cx',cx).attr('cy',cy-28*s-r).attr('r',r);
+      g.append('line').attr('x1',cx).attr('y1',cy).attr('x2',cx).attr('y2',cy-28*s+2).attr('stroke','#999').attr('stroke-width',1.5).attr('stroke-dasharray','4,3');
+      g.append('circle').attr('cx',cx).attr('cy',cy-28*s-r).attr('r',r+3*s).attr('fill','#fff').attr('stroke','#ddd').attr('stroke-width',1);
+      g.append('image').attr('x',cx-r).attr('y',cy-28*s-r*2).attr('width',r*2).attr('height',r*2).attr('href',p.img).attr('preserveAspectRatio','xMidYMid slice').attr('clip-path',`url(#${clipId})`);
+      g.append('text').attr('x',cx).attr('y',cy-28*s+r+12*s).attr('text-anchor','middle').attr('fill','#333').attr('font-size',10.5*s).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
+      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
+    } else {
+      g.append('path').attr('d',`M ${cx},${cy} c ${-.5*s},${-s} ${-7*s},${-11*s} ${-7*s},${-15*s} a ${7*s},${7*s} 0 1,1 ${14*s},0 c 0,${4*s} ${-6.5*s},${14*s} ${-7*s},${15*s} z`).attr('fill',p.color).attr('opacity',.95);
+      g.append('circle').attr('cx',cx).attr('cy',cy-15*s).attr('r',3*s).attr('fill','#fff').attr('opacity',.9);
+      const fs=13*s,tw=p.name.length*fs*.8+18*s,lh=fs*2,lx=cx-tw/2,ly=cy-24*s-lh-5*s;
+      g.append('path').attr('d',`M ${cx-4.5*s} ${ly+lh} l ${4.5*s} ${5*s} l ${4.5*s} ${-5*s} Z`).attr('fill','#1A1A2E');
+      g.append('rect').attr('x',lx).attr('y',ly).attr('width',tw).attr('height',lh).attr('rx',6*s).attr('fill','#1A1A2E');
+      g.append('text').attr('x',cx).attr('y',ly+lh/2).attr('dy','.37em').attr('text-anchor','middle').attr('fill','#fff').attr('font-size',fs).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
+    }
+  });
+}
+
+// ═══ ZOOM ═══
+function zIn(){svg.transition().duration(300).call(zm.scaleBy,1.5)}
+function zOut(){svg.transition().duration(300).call(zm.scaleBy,.67)}
+function zReset(){svg.transition().duration(500).call(zm.transform,d3.zoomIdentity)}
+function fly(lo,la,sc){const s=sc/220,[x,y]=proj([lo,la]);svg.transition().duration(800).call(zm.transform,d3.zoomIdentity.translate(W/2,H/2).scale(s).translate(-x,-y));}
+
+// ═══ EXPORT ═══
+function exportSVG(){
+  const str=new XMLSerializer().serializeToString(svg.node());
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([str],{type:'image/svg+xml'}));a.download='my_world_map.svg';a.click();
+}
+
+// ═══ RESET ═══
+function resetAll(){if(!confirm('초기화할까요?'))return;painted={};pins=[];rSelList();rPiList();updColors();drawPins();zReset();}
+
+// ═══ INIT ═══
+rPals();rSelList();rPiList();loadMap();
+</script>
+</body>
+</html>
