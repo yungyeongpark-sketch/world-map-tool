@@ -465,31 +465,77 @@ function updColors(){
 }
 
 // ═══ DRAW PINS ═══
+function calcLabelPos(pts,s){
+  // 겹침 판정 거리 (스케일 반영)
+  const NEAR=50/s;
+  return pts.map((p,i)=>{
+    const neighbors=[];
+    for(let j=0;j<pts.length;j++){
+      if(i===j)continue;
+      if(Math.hypot(p.cx-pts[j].cx,p.cy-pts[j].cy)<NEAR) neighbors.push(j);
+    }
+    if(!neighbors.length) return {lx:p.cx, ly:p.cy-40*s, leader:false};
+    // 이웃 무게중심 반대 방향으로 밀어내기
+    let ax=0,ay=0;
+    neighbors.forEach(j=>{ax+=pts[j].cx;ay+=pts[j].cy});
+    ax/=neighbors.length;ay/=neighbors.length;
+    let dx=p.cx-ax,dy=p.cy-ay;
+    const len=Math.hypot(dx,dy)||1;
+    dx/=len;dy/=len;
+    const off=(65+neighbors.length*15)*s;
+    return {lx:p.cx+dx*off, ly:p.cy+dy*off, leader:true};
+  });
+}
+
 function drawPins(){
   gP.selectAll('*').remove();
   const defs=svg.select('defs');defs.selectAll('[id^="ic"]').remove();
+  const s=lSize*lBase;
+
+  // 좌표 계산
+  const pts=pins.map(p=>{const [cx,cy]=proj([p.lon,p.lat]);return {cx,cy};});
+  const lpos=calcLabelPos(pts,s);
+
   pins.forEach((p,i)=>{
-    const [cx,cy]=proj([p.lon,p.lat]);if(!cx||!cy)return;
-    const g=gP.append('g'),s=lSize*lBase;
+    const {cx,cy}=pts[i];if(!cx||!cy)return;
+    const lp=lpos[i];
+    const g=gP.append('g');
     g.style('cursor','pointer').on('click',function(ev){
       ev.stopPropagation();
       if(confirm(`"${p.name}" 핀을 삭제할까요?`)){rmPi(i);}
     });
+
     if(lStyle==='image'&&p.img){
       const r=24*s,clipId='ic'+i;
-      defs.append('clipPath').attr('id',clipId).append('circle').attr('cx',cx).attr('cy',cy-28*s-r).attr('r',r);
-      g.append('line').attr('x1',cx).attr('y1',cy).attr('x2',cx).attr('y2',cy-28*s+2).attr('stroke','#999').attr('stroke-width',1.5).attr('stroke-dasharray','4,3');
-      g.append('circle').attr('cx',cx).attr('cy',cy-28*s-r).attr('r',r+3*s).attr('fill','#fff').attr('stroke','#ddd').attr('stroke-width',1);
-      g.append('image').attr('x',cx-r).attr('y',cy-28*s-r*2).attr('width',r*2).attr('height',r*2).attr('href',p.img).attr('preserveAspectRatio','xMidYMid slice').attr('clip-path',`url(#${clipId})`);
-      g.append('text').attr('x',cx).attr('y',cy-28*s+r+12*s).attr('text-anchor','middle').attr('fill','#333').attr('font-size',10.5*s).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
+      defs.append('clipPath').attr('id',clipId).append('circle').attr('cx',lp.lx).attr('cy',lp.ly-r).attr('r',r);
+      // 리더라인
+      if(lp.leader){
+        g.append('path').attr('d',`M ${cx} ${cy} L ${cx} ${lp.ly} L ${lp.lx} ${lp.ly}`).attr('fill','none').attr('stroke',p.color).attr('stroke-width',1.5).attr('stroke-dasharray','4,3').attr('opacity',.5);
+      } else {
+        g.append('line').attr('x1',cx).attr('y1',cy).attr('x2',lp.lx).attr('y2',lp.ly+2).attr('stroke','#999').attr('stroke-width',1.5).attr('stroke-dasharray','4,3');
+      }
+      g.append('circle').attr('cx',lp.lx).attr('cy',lp.ly-r).attr('r',r+3*s).attr('fill','#fff').attr('stroke','#ddd').attr('stroke-width',1);
+      g.append('image').attr('x',lp.lx-r).attr('y',lp.ly-r*2).attr('width',r*2).attr('height',r*2).attr('href',p.img).attr('preserveAspectRatio','xMidYMid slice').attr('clip-path',`url(#${clipId})`);
+      g.append('text').attr('x',lp.lx).attr('y',lp.ly+r+12*s).attr('text-anchor','middle').attr('fill','#333').attr('font-size',10.5*s).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
       g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
     } else {
-      g.append('path').attr('d',`M ${cx},${cy} c ${-.5*s},${-s} ${-7*s},${-11*s} ${-7*s},${-15*s} a ${7*s},${7*s} 0 1,1 ${14*s},0 c 0,${4*s} ${-6.5*s},${14*s} ${-7*s},${15*s} z`).attr('fill',p.color).attr('opacity',.95);
-      g.append('circle').attr('cx',cx).attr('cy',cy-15*s).attr('r',3*s).attr('fill','#fff').attr('opacity',.9);
-      const fs=13*s,tw=p.name.length*fs*.8+18*s,lh=fs*2,lx=cx-tw/2,ly=cy-24*s-lh-5*s;
-      g.append('path').attr('d',`M ${cx-4.5*s} ${ly+lh} l ${4.5*s} ${5*s} l ${4.5*s} ${-5*s} Z`).attr('fill','#1A1A2E');
-      g.append('rect').attr('x',lx).attr('y',ly).attr('width',tw).attr('height',lh).attr('rx',6*s).attr('fill','#1A1A2E');
-      g.append('text').attr('x',cx).attr('y',ly+lh/2).attr('dy','.37em').attr('text-anchor','middle').attr('fill','#fff').attr('font-size',fs).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
+      // 핀 점
+      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
+
+      const fs=13*s,tw=p.name.length*fs*.8+18*s,lh=fs*2;
+      const bx=lp.lx-tw/2,by=lp.ly-lh/2;
+
+      if(lp.leader){
+        // 리더라인: 꺾은선
+        g.append('path').attr('d',`M ${cx} ${cy} L ${cx} ${lp.ly} L ${lp.lx} ${lp.ly}`).attr('fill','none').attr('stroke',p.color).attr('stroke-width',1.5).attr('stroke-dasharray','4,3').attr('opacity',.5);
+        g.append('circle').attr('cx',cx).attr('cy',lp.ly).attr('r',2*s).attr('fill',p.color).attr('opacity',.4);
+      } else {
+        // 겹침 없음: 기존 꼬리 삼각형
+        g.append('path').attr('d',`M ${lp.lx-4.5*s} ${by+lh} l ${4.5*s} ${5*s} l ${4.5*s} ${-5*s} Z`).attr('fill','#1A1A2E');
+      }
+
+      g.append('rect').attr('x',bx).attr('y',by).attr('width',tw).attr('height',lh).attr('rx',6*s).attr('fill','#1A1A2E');
+      g.append('text').attr('x',lp.lx).attr('y',lp.ly).attr('dy','.37em').attr('text-anchor','middle').attr('fill','#fff').attr('font-size',fs).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
     }
   });
 }
