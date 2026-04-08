@@ -509,7 +509,7 @@ function drawPins(){
   pins.forEach((p,i)=>{
     const {cx,cy}=pts[i];if(!cx||!cy)return;
     const dir=dirs[i];
-    const dist=30+20*s;
+    const dist=20+12*s;
     const lx=cx+dir.dx*dist, ly=cy+dir.dy*dist;
     const g=gP.append('g');
     g.style('cursor','pointer').on('click',function(ev){
