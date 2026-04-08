@@ -265,14 +265,11 @@ const defaultPins=[
   {name:'칸쿤',lon:-86.8515,lat:21.1619,color:'#50C878',img:''}
 ];
 
-// US FIPS
-const usN={'01':'Alabama','02':'Alaska','04':'Arizona','05':'Arkansas','06':'California','08':'Colorado','09':'Connecticut','10':'Delaware','11':'DC','12':'Florida','13':'Georgia','15':'Hawaii','16':'Idaho','17':'Illinois','18':'Indiana','19':'Iowa','20':'Kansas','21':'Kentucky','22':'Louisiana','23':'Maine','24':'Maryland','25':'Massachusetts','26':'Michigan','27':'Minnesota','28':'Mississippi','29':'Missouri','30':'Montana','31':'Nebraska','32':'Nevada','33':'New Hampshire','34':'New Jersey','35':'New Mexico','36':'New York','37':'North Carolina','38':'North Dakota','39':'Ohio','40':'Oklahoma','41':'Oregon','42':'Pennsylvania','44':'Rhode Island','45':'South Carolina','46':'South Dakota','47':'Tennessee','48':'Texas','49':'Utah','50':'Vermont','51':'Virginia','53':'Washington','54':'West Virginia','55':'Wisconsin','56':'Wyoming','72':'Puerto Rico'};
-
 function rName(f){
   const p=f.properties||{};
-  return p.name||p.NAME||p.state_name||p.NOMGEO||p.NOM_ENT||p.ESTADO||p.name_en||p.gn_name||p.admin||p.NAME_1||usN[String(f.id).padStart(2,'0')]||'';
+  return p.name||p.NAME||p.name_en||p.state_name||p.NOMGEO||p.NOM_ENT||p.ESTADO||p.gn_name||p.NAME_1||'';
 }
-function aName(f){const p=f.properties||{};return p.admin||p.ADM0_A3||p.sov_a3||'';}
+function aName(f){const p=f.properties||{};return p.admin||p.ADM0_A3||p.adm0_a3||p.sov_a3||'';}
 
 // ═══ PALETTE ═══
 function rPal(id,sel,eraser){
@@ -391,64 +388,35 @@ async function ff(urls){for(const u of urls){try{const r=await fetch(u);if(r.ok)
 
 async function loadMap(){
   setup();
+  const ld=document.getElementById('ld');
 
-  // 나라 단위 (CDN, 안정적) + 미국 주 단위 + 멕시코 주 단위
+  // 전세계 행정구역 (주/도 단위) — Natural Earth admin-1
+  const admin1=[
+    'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson',
+  ];
+  // 국가 단위 fallback
   const cty=[
     'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',
     'https://unpkg.com/world-atlas@2/countries-50m.json',
     'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
   ];
-  const us=[
-    'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
-    'https://unpkg.com/us-atlas@3/states-10m.json',
-  ];
-  const mx=[
-    'https://cdn.jsdelivr.net/gh/strotgen/mexico-leaflet@master/states.geojson',
-    'https://cdn.jsdelivr.net/gh/PhantomInsights/mexico-geojson@main/national/states.json',
-    'https://raw.githubusercontent.com/strotgen/mexico-leaflet/master/states.geojson',
-  ];
 
-  const [cd, ud, md] = await Promise.all([ff(cty), ff(us), ff(mx)]);
+  ld.textContent='전세계 행정구역 데이터 로딩 중… (최초 1회 약 40MB)';
+  const ad=await ff(admin1);
 
-  if(!cd){
-    document.getElementById('ld').textContent='지도 데이터를 불러올 수 없습니다.';return;
+  if(ad && ad.type==='FeatureCollection'){
+    // admin-1 성공: 전세계 주/도 단위
+    features=ad.features;
+  } else {
+    // fallback: 국가 단위
+    ld.textContent='국가 단위 데이터로 대체 로딩 중...';
+    const cd=await ff(cty);
+    if(!cd){ld.textContent='지도 데이터를 불러올 수 없습니다.';return;}
+    const k=Object.keys(cd.objects)[0];
+    features=topojson.feature(cd,cd.objects[k]).features;
   }
 
-  // 나라 파싱
-  const k=Object.keys(cd.objects)[0];
-  let cf=topojson.feature(cd,cd.objects[k]).features;
-
-  // 미국은 주 단위로 교체
-  let uf=[];
-  if(ud){
-    cf=cf.filter(f=>{const id=f.id||(f.properties||{}).id;return id!=='840'&&id!==840;});
-    const uk=Object.keys(ud.objects)[0];
-    uf=topojson.feature(ud,ud.objects[uk]).features;
-  }
-
-  // 멕시코도 주 단위로 교체
-  let mf=[];
-  if(md){
-    cf=cf.filter(f=>{const id=f.id||(f.properties||{}).id;return id!=='484'&&id!==484;});
-    // GeoJSON: features 바로 사용, TopoJSON: objects에서 파싱
-    if(md.type==='FeatureCollection'){
-      mf=md.features;
-    } else if(md.objects){
-      const mk=Object.keys(md.objects)[0];
-      mf=topojson.feature(md,md.objects[mk]).features;
-    }
-    // 이름 속성 통일 (state_name, name, NAME 등)
-    mf.forEach(f=>{
-      const p=f.properties||{};
-      if(!p.name){
-        p.name=p.state_name||p.NOMGEO||p.NOM_ENT||p.ESTADO||p.NAME||p.state_code||'';
-      }
-    });
-  }
-  features=[...cf,...uf,...mf];
-
-  document.getElementById('ld').remove();
-
+  ld.remove();
   rSelList();
 
   gR.selectAll('.region').data(features).enter().append('path')
@@ -473,19 +441,12 @@ async function loadMap(){
 
   // 기본 핀 & 컬러링 적용
   pins=[...defaultPins];
-  // 멕시코 주 단위 컬러링 (다양한 이름 형식 대응)
   const mxColors={
-    // 멕시코시티 / Estado de México 영역 (파란색)
-    'Distrito Federal':'#5B9BD5','Ciudad de México':'#5B9BD5','CDMX':'#5B9BD5',
-    'México':'#5B9BD5','Estado de México':'#5B9BD5','Mexico City':'#5B9BD5',
-    // 와하카 (주황색)
+    'Distrito Federal':'#5B9BD5','Ciudad de México':'#5B9BD5',
+    'México':'#5B9BD5','Estado de México':'#5B9BD5',
     'Oaxaca':'#F5A623',
-    // 칸쿤이 있는 킨타나로오 (초록색)
     'Quintana Roo':'#50C878',
   };
-  // 멕시코 주 데이터가 없는 경우 국가 단위 fallback
-  if(!md) painted['Mexico']='#5B9BD5';
-  // 주 단위 컬러링 적용
   features.forEach(f=>{
     const n=rName(f);
     if(mxColors[n]) painted[n]=mxColors[n];
