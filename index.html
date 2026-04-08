@@ -259,11 +259,6 @@ const colors=['#5B9BD5','#F5A623','#50C878','#E74C3C','#9B59B6','#FF6B9D','#1ABC
 let pal=[...colors];
 const tip=d3.select('#tip');
 
-const defaultPins=[
-  {name:'멕시코시티',lon:-99.1332,lat:19.4326,color:'#5B9BD5',img:''},
-  {name:'와하카',lon:-96.7266,lat:17.0732,color:'#F5A623',img:''},
-  {name:'칸쿤',lon:-86.8515,lat:21.1619,color:'#50C878',img:''}
-];
 
 function rName(f){
   const p=f.properties||{};
@@ -439,23 +434,7 @@ async function loadMap(){
     .on('mousemove',function(ev){tip.style('left',(ev.offsetX+12)+'px').style('top',(ev.offsetY-32)+'px');})
     .on('mouseout',()=>tip.style('opacity',0));
 
-  // 기본 핀 & 컬러링 적용
-  pins=[...defaultPins];
-  const mxColors={
-    'Distrito Federal':'#5B9BD5','Ciudad de México':'#5B9BD5',
-    'México':'#5B9BD5','Estado de México':'#5B9BD5',
-    'Oaxaca':'#F5A623',
-    'Quintana Roo':'#50C878',
-  };
-  features.forEach(f=>{
-    const n=rName(f);
-    if(mxColors[n]) painted[n]=mxColors[n];
-  });
-  rSelList();updColors();
-  rPiList();drawPins();
-
-  // 멕시코 뷰로 자동 이동
-  setTimeout(()=>fly(-102,23.5,1800),800);
+  rSelList();rPiList();drawPins();
   setTimeout(()=>document.getElementById('hint').classList.add('hid'),4000);
 }
 
