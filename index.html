@@ -526,25 +526,14 @@ function drawPins(){
       g.append('text').attr('x',lx).attr('y',ly+r+12*s).attr('text-anchor','middle').attr('fill','#333').attr('font-size',10.5*s).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
       g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
     } else {
-      // 핀 점
-      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
-
       const fs=13*s,tw=p.name.length*fs*.8+18*s,lh=fs*2;
       const bx=lx-tw/2,by=ly-lh/2;
-      const isDiag=dir.dx!==0&&dir.dy!==0;
 
-      // 꼬리 삼각형 or 대각선 점선
-      if(isDiag){
-        g.append('line').attr('x1',cx).attr('y1',cy).attr('x2',lx).attr('y2',ly).attr('stroke',p.color).attr('stroke-width',1).attr('stroke-dasharray','3,2').attr('opacity',.5);
-      } else if(dir.dy===-1&&dir.dx===0){
-        g.append('path').attr('d',`M ${lx-4.5*s} ${by+lh} l ${4.5*s} ${5*s} l ${4.5*s} ${-5*s} Z`).attr('fill','#1A1A2E');
-      } else if(dir.dy===1&&dir.dx===0){
-        g.append('path').attr('d',`M ${lx-4.5*s} ${by} l ${4.5*s} ${-5*s} l ${4.5*s} ${5*s} Z`).attr('fill','#1A1A2E');
-      } else if(dir.dx===-1&&dir.dy===0){
-        g.append('path').attr('d',`M ${bx+tw} ${ly-4*s} l ${5*s} ${4*s} l ${-5*s} ${4*s} Z`).attr('fill','#1A1A2E');
-      } else if(dir.dx===1&&dir.dy===0){
-        g.append('path').attr('d',`M ${bx} ${ly-4*s} l ${-5*s} ${4*s} l ${5*s} ${4*s} Z`).attr('fill','#1A1A2E');
-      }
+      // 핀 색상 연결선 (항상 표시)
+      g.append('line').attr('x1',cx).attr('y1',cy).attr('x2',lx).attr('y2',ly).attr('stroke',p.color).attr('stroke-width',1.2).attr('opacity',.6);
+
+      // 핀 점
+      g.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4*s).attr('fill',p.color).attr('stroke','#fff').attr('stroke-width',2);
 
       g.append('rect').attr('x',bx).attr('y',by).attr('width',tw).attr('height',lh).attr('rx',6*s).attr('fill','#1A1A2E');
       g.append('text').attr('x',lx).attr('y',ly).attr('dy','.37em').attr('text-anchor','middle').attr('fill','#fff').attr('font-size',fs).attr('font-weight','700').attr('font-family',"'Noto Sans KR',sans-serif").text(p.name);
