@@ -434,7 +434,41 @@ async function loadMap(){
     .on('mousemove',function(ev){tip.style('left',(ev.offsetX+12)+'px').style('top',(ev.offsetY-32)+'px');})
     .on('mouseout',()=>tip.style('opacity',0));
 
-  rSelList();rPiList();drawPins();
+  // ── 캐나다 기본 색칠 ──
+  const caColors={
+    // 동부 (레드)
+    'Ontario':'#E74C3C','Quebec':'#E74C3C',
+    // 서부 (그린)
+    'Alberta':'#50C878','British Columbia':'#50C878',
+    // 북부 (블루)
+    'Northwest Territories':'#5B9BD5','Yukon':'#5B9BD5',
+  };
+  features.forEach(f=>{
+    const n=rName(f);
+    if(caColors[n]) painted[n]=caColors[n];
+  });
+
+  // ── 캐나다 기본 핀 ──
+  pins=[
+    // 동부
+    {name:'토론토',lon:-79.3832,lat:43.6532,color:'#E74C3C',img:''},
+    {name:'오타와',lon:-75.6972,lat:45.4215,color:'#E74C3C',img:''},
+    {name:'몬트리올',lon:-73.5673,lat:45.5017,color:'#E74C3C',img:''},
+    {name:'퀘벡',lon:-71.2080,lat:46.8139,color:'#E74C3C',img:''},
+    // 서부
+    {name:'캘거리',lon:-114.0719,lat:51.0447,color:'#50C878',img:''},
+    {name:'밴프',lon:-115.5708,lat:51.1784,color:'#50C878',img:''},
+    {name:'제스퍼',lon:-118.0814,lat:52.8737,color:'#50C878',img:''},
+    {name:'밴쿠버',lon:-123.1216,lat:49.2827,color:'#50C878',img:''},
+    // 북부
+    {name:'옐로나이프',lon:-114.3718,lat:62.4540,color:'#5B9BD5',img:''},
+    {name:'유콘',lon:-135.0568,lat:60.7212,color:'#5B9BD5',img:''},
+  ];
+
+  rSelList();updColors();rPiList();drawPins();
+
+  // 캐나다 뷰로 자동 이동
+  setTimeout(()=>fly(-96,56,800),800);
   setTimeout(()=>document.getElementById('hint').classList.add('hid'),4000);
 }
 
