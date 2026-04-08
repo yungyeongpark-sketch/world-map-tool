@@ -485,14 +485,14 @@ const dirOptions=[
 ];
 
 function calcDirs(pts,s){
-  const NEAR=50/s;
+  const NEAR=120/s;
   return pts.map((p,i)=>{
     const neighbors=[];
     for(let j=0;j<pts.length;j++){
       if(i===j)continue;
       if(Math.hypot(p.cx-pts[j].cx,p.cy-pts[j].cy)<NEAR) neighbors.push(j);
     }
-    if(!neighbors.length) return dirOptions[0]; // 기본 위쪽
+    if(!neighbors.length) return dirOptions[0];
     const group=[i,...neighbors].sort((a,b)=>a-b);
     return dirOptions[group.indexOf(i)%dirOptions.length];
   });
@@ -509,7 +509,7 @@ function drawPins(){
   pins.forEach((p,i)=>{
     const {cx,cy}=pts[i];if(!cx||!cy)return;
     const dir=dirs[i];
-    const dist=38*s;
+    const dist=60*s;
     const lx=cx+dir.dx*dist, ly=cy+dir.dy*dist;
     const g=gP.append('g');
     g.style('cursor','pointer').on('click',function(ev){
